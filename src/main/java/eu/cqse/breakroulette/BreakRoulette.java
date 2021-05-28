@@ -113,7 +113,9 @@ public class BreakRoulette {
 
     private static void saveToFile(List<String> matches) throws IOException {
         List<String> content = Files.readAllLines(Path.of(PREVIOUS_PAIRS_FILE));
-        content.add("");
+        if (!content.isEmpty()) {
+            content.add("");
+        }
         content.addAll(matches);
         Files.write(Path.of(PREVIOUS_PAIRS_FILE), content);
     }
@@ -163,20 +165,19 @@ public class BreakRoulette {
         previousPairs = previousPairs.subList(cutoffIndex, previousPairs.size());
         // We shall now try to find a good set of matches. If we don't find one, cut off some of the older history
         // and try again until it works out.
-        Optional<Set<Pair>> foundMatches;
-        while (previousPairs.size() - 1 > meetingsInAWeek) {
+        do {
             HashSet<Pair> potentialPairsWithExcludedHistory = new HashSet<>(potentialPairs);
             // This is where the magic happens: Exclude all pairs we have already seen in the considered chunk of
             // history from the list of possible pairs, so the only remaining possible matches are guaranteed fresh
             potentialPairsWithExcludedHistory.removeAll(previousPairs);
             // This performs the actual work of finding matches, up until now we have just done some
             // book-keeping of how much history we want to consider
-            foundMatches = findMatches(potentialPairsWithExcludedHistory, new HashSet<>());
+            Optional<Set<Pair>> foundMatches = findMatches(potentialPairsWithExcludedHistory, new HashSet<>());
             if (foundMatches.isPresent()) {
                 return foundMatches.get();
             }
             previousPairs = previousPairs.subList(meetingsInAWeek, previousPairs.size());
-        }
+        } while (previousPairs.size() - 1 > meetingsInAWeek);
         throw new IllegalStateException("Could not find any matches!");
     }
 
