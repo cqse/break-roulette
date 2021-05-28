@@ -1,0 +1,2 @@
+example@example.com
+different_example@example.com
