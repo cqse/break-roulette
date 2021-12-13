@@ -1,15 +1,11 @@
 package eu.cqse.breakroulette;
 
-import com.google.common.collect.Sets;
+import com.google.common.collect.*;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -169,7 +165,7 @@ public class BreakRoulette {
             HashSet<Pair> potentialPairsWithExcludedHistory = new HashSet<>(potentialPairs);
             // This is where the magic happens: Exclude all pairs we have already seen in the considered chunk of
             // history from the list of possible pairs, so the only remaining possible matches are guaranteed fresh
-            potentialPairsWithExcludedHistory.removeAll(previousPairs);
+            previousPairs.forEach(potentialPairsWithExcludedHistory::remove);
             // This performs the actual work of finding matches, up until now we have just done some
             // book-keeping of how much history we want to consider
             Optional<Set<Pair>> foundMatches = findMatches(potentialPairsWithExcludedHistory, new HashSet<>());
@@ -202,7 +198,7 @@ public class BreakRoulette {
         if (potentialPairs.isEmpty()) {
             return Optional.of(foundSoFar);
         }
-        for (Pair potentialPair : potentialPairs) {
+        for (Pair potentialPair : retainHardestPairToMatch(potentialPairs)) {
             Set<Pair> remainingPotentialPairs = removeParticipants(potentialPair, potentialPairs);
             // Check if we arrived at some impossible to continue combination by mistake
             if (!isDifferenceExactlyTwoParticipants(remainingPotentialPairs, potentialPairs)) {
@@ -217,6 +213,24 @@ public class BreakRoulette {
             }
         }
         return Optional.empty();
+    }
+
+   /**
+     * Counts the occurrences of each participant in the given pairs and retains only the pairs that contain the
+     * participant with the lowest number of occurrences. This maximizes the likelihood of backtracking as early as
+     * possible, since we find impossible combinations as early on as we can.
+     */
+    private static Set<Pair> retainHardestPairToMatch(Set<Pair> pairs) {
+        if (pairs.isEmpty()) {
+            return Collections.emptySet();
+        }
+        SortedMultiset<String> participantOccurrences = TreeMultiset.create();
+        for (Pair pair : pairs) {
+            participantOccurrences.add(pair.left);
+            participantOccurrences.add(pair.right);
+        }
+        String lowestOccurrence = participantOccurrences.firstEntry().getElement();
+        return pairs.stream().filter(pair -> pair.contains(lowestOccurrence)).collect(Collectors.toSet());
     }
 
     /**
@@ -234,9 +248,11 @@ public class BreakRoulette {
 
     /** Returns a new set of potential pairs, where no potential pair contains any participant of the pair to remove. */
     private static Set<Pair> removeParticipants(Pair pairToRemove, Set<Pair> potentialPairs) {
-        HashSet<Pair> copy = new HashSet<>(potentialPairs);
-        copy.remove(pairToRemove);
-        copy.removeIf(entry -> containsParticipant(entry, pairToRemove));
+        HashSet<Pair> copy = new HashSet<>(potentialPairs.size());
+        for (Pair potentialPair : potentialPairs) {
+            if (!containsParticipant(potentialPair, pairToRemove))
+                copy.add(potentialPair);
+        }
         return copy;
     }
 
